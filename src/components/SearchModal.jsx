@@ -1,0 +1,203 @@
+import { useState, useCallback } from 'react'
+import { SearchIcon, PlusIcon, CloseIcon, BookIcon } from './Icons'
+
+function debounce(fn, delay) {
+  let timer
+  return (...args) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => fn(...args), delay)
+  }
+}
+
+async function fetchBooks(query) {
+  if (!query.trim()) return []
+
+  // Busca na Open Library priorizando português
+  const params = new URLSearchParams({
+    q: query,
+    language: 'por',
+    limit: '15',
+    fields: 'key,title,author_name,cover_i,first_publish_year,number_of_pages_median',
+  })
+
+  const res = await fetch(`https://openlibrary.org/search.json?${params}`)
+  const data = await res.json()
+  const docs = data.docs || []
+
+  // Se não achou nada em português, busca sem restrição de idioma
+  if (docs.length === 0) {
+    const fallbackParams = new URLSearchParams({
+      q: query,
+      limit: '12',
+      fields: 'key,title,author_name,cover_i,first_publish_year,number_of_pages_median',
+    })
+    const fallbackRes = await fetch(`https://openlibrary.org/search.json?${fallbackParams}`)
+    const fallbackData = await fallbackRes.json()
+    return mapDocs(fallbackData.docs || [])
+  }
+
+  return mapDocs(docs)
+}
+
+function mapDocs(docs) {
+  return docs.map((doc) => ({
+    googleId: doc.key,
+    title: doc.title || 'Sem título',
+    author: (doc.author_name || ['Autor desconhecido']).slice(0, 2).join(', '),
+    cover: doc.cover_i
+      ? `https://covers.openlibrary.org/b/id/${doc.cover_i}-L.jpg`
+      : null,
+    year: doc.first_publish_year?.toString() || '',
+    pages: doc.number_of_pages_median || null,
+  }))
+}
+
+export default function SearchModal({ onAdd, onClose }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [added, setAdded] = useState(new Set())
+
+  const search = useCallback(
+    debounce(async (q) => {
+      if (!q.trim()) { setResults([]); return }
+      setLoading(true)
+      setError(null)
+      try {
+        const books = await fetchBooks(q)
+        setResults(books)
+      } catch {
+        setError('Erro ao buscar livros. Tente novamente.')
+      } finally {
+        setLoading(false)
+      }
+    }, 500),
+    []
+  )
+
+  function handleChange(e) {
+    setQuery(e.target.value)
+    search(e.target.value)
+  }
+
+  function handleAdd(book) {
+    onAdd({ ...book, id: crypto.randomUUID(), rating: 0, progress: 0 })
+    setAdded((prev) => new Set([...prev, book.googleId]))
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-[#1a0a3d]/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-3xl shadow-2xl shadow-purple-900/20 w-full max-w-2xl flex flex-col overflow-hidden max-h-[88vh]">
+
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-purple-100 bg-gradient-to-br from-[#f3eeff] to-white">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#6b48b0] flex items-center justify-center">
+                <BookIcon size={18} className="text-white" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-[#3d1d80]">Adicionar livro</h2>
+                <p className="text-xs text-purple-400">Busca via Google Books</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-purple-300 hover:text-purple-600 transition-colors w-8 h-8 flex items-center justify-center rounded-xl hover:bg-purple-50"
+            >
+              <CloseIcon size={16} />
+            </button>
+          </div>
+
+          <div className="relative flex items-center">
+            <SearchIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-purple-300 pointer-events-none" />
+            <input
+              autoFocus
+              type="text"
+              placeholder="Buscar por título, autor ou ISBN..."
+              value={query}
+              onChange={handleChange}
+              className="w-full pl-11 pr-4 py-3 rounded-xl border border-purple-200 focus:outline-none focus:ring-2 focus:ring-purple-400 text-sm bg-white text-purple-900 placeholder:text-purple-300 shadow-sm"
+            />
+          </div>
+        </div>
+
+        {/* Results */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {loading && (
+            <div className="flex justify-center items-center py-16">
+              <div className="w-8 h-8 border-4 border-purple-200 border-t-[#6b48b0] rounded-full animate-spin" />
+            </div>
+          )}
+
+          {error && (
+            <p className="text-center text-red-400 py-8 text-sm">{error}</p>
+          )}
+
+          {!loading && !error && results.length === 0 && query.trim() && (
+            <div className="flex flex-col items-center py-16 text-purple-300">
+              <BookIcon size={40} className="mb-3 text-purple-200" />
+              <p className="font-semibold text-purple-500">Nenhum livro encontrado</p>
+              <p className="text-sm mt-1 text-purple-300">Tente buscar por outro termo</p>
+            </div>
+          )}
+
+          {!loading && !error && results.length === 0 && !query.trim() && (
+            <div className="flex flex-col items-center py-16 text-purple-300">
+              <SearchIcon size={40} className="mb-3 text-purple-200" />
+              <p className="font-semibold text-purple-500">Digite para buscar livros</p>
+            </div>
+          )}
+
+          {!loading && results.length > 0 && (
+            <div className="flex flex-col gap-0.5">
+              {results.map((book) => (
+                <div
+                  key={book.googleId}
+                  className="flex items-center gap-4 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors group"
+                >
+                  <div className="w-11 h-16 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
+                    {book.cover ? (
+                      <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <BookIcon size={18} className="text-purple-300" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
+                    <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
+                    <p className="text-purple-300 text-xs mt-0.5">
+                      {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => handleAdd(book)}
+                    disabled={added.has(book.googleId)}
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
+                      added.has(book.googleId)
+                        ? 'bg-purple-100 text-purple-400 cursor-default'
+                        : 'bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white shadow-sm shadow-purple-200'
+                    }`}
+                  >
+                    {added.has(book.googleId) ? (
+                      '✓ Adicionado'
+                    ) : (
+                      <>
+                        <PlusIcon size={12} />
+                        Adicionar
+                      </>
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

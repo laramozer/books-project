@@ -3,7 +3,7 @@ import Dexie from 'dexie'
 export const db = new Dexie('MinhaEstante')
 
 db.version(1).stores({
-  books: 'id, googleId, title, author, rating, progress, createdAt',
+  books: 'id, googleId, title, author, rating, progress, currentPage, createdAt',
 })
 
 db.version(2).stores({

@@ -44,33 +44,33 @@ export default function App() {
   return (
     <div className="min-h-screen bg-[#f3eeff] flex">
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-[#6b48b0] fixed top-0 left-0 z-50">
-        <div className="px-6 py-7 flex items-center gap-3 border-b border-white/10">
-          <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center">
-            <LayersIcon size={20} className="text-white" />
+      <aside className="hidden lg:flex flex-col w-64 min-h-screen bg-white border-r border-purple-100 fixed top-0 left-0 z-50">
+        <div className="px-6 py-7 flex items-center gap-3 border-b border-purple-100">
+          <div className="w-9 h-9 rounded-xl bg-[#ede8ff] flex items-center justify-center">
+            <LayersIcon size={20} className="text-[#6b48b0]" />
           </div>
           <div>
-            <p className="text-white font-bold text-base leading-tight">Minha Estante</p>
-            <p className="text-purple-300 text-xs">{books.length} {books.length === 1 ? 'livro' : 'livros'}</p>
+            <p className="text-[#3d1d80] font-bold text-base leading-tight">Minha Estante</p>
+            <p className="text-purple-400 text-xs">{books.length} {books.length === 1 ? 'livro' : 'livros'}</p>
           </div>
         </div>
 
-        <nav className="flex flex-col gap-1 px-3 py-6 flex-1">
-          <p className="text-purple-300/60 text-[10px] font-semibold uppercase tracking-widest px-3 mb-2">Biblioteca</p>
+        <nav className="flex flex-col gap-0.5 px-3 py-6 flex-1">
+          <p className="text-purple-300 text-[10px] font-semibold uppercase tracking-widest px-3 mb-2">Biblioteca</p>
           {navItems.map(({ id, label, icon: Icon, count }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 w-full text-left ${
                 activeTab === id
-                  ? 'bg-white/15 text-white shadow-sm'
-                  : 'text-purple-200 hover:bg-white/8 hover:text-white'
+                  ? 'bg-[#ede8ff] text-[#6b48b0]'
+                  : 'text-purple-400 hover:bg-purple-50 hover:text-[#6b48b0]'
               }`}
             >
               <Icon size={17} />
               <span className="flex-1">{label}</span>
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                activeTab === id ? 'bg-white/20 text-white' : 'bg-white/10 text-purple-300'
+                activeTab === id ? 'bg-[#6b48b0] text-white' : 'bg-purple-100 text-purple-400'
               }`}>
                 {count}
               </span>
@@ -81,7 +81,7 @@ export default function App() {
         <div className="px-4 pb-8">
           <button
             onClick={() => setShowSearch(true)}
-            className="w-full bg-[#c4a8e8] hover:bg-[#d0b8f0] active:scale-95 text-[#3d1d80] font-bold py-3 rounded-xl text-sm transition-all duration-150 flex items-center justify-center gap-2 shadow-lg shadow-purple-900/20"
+            className="w-full bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white font-bold py-3 rounded-xl text-sm transition-all duration-150 flex items-center justify-center gap-2 shadow-md shadow-purple-200"
           >
             <PlusIcon size={16} />
             Adicionar livro
@@ -95,8 +95,8 @@ export default function App() {
         <header className="sticky top-0 z-40 bg-[#f3eeff]/90 backdrop-blur-md border-b border-purple-100">
           <div className="px-6 py-4 flex items-center gap-4">
             <div className="flex items-center gap-2.5 lg:hidden mr-auto">
-              <div className="w-8 h-8 rounded-xl bg-[#6b48b0] flex items-center justify-center">
-                <LayersIcon size={16} className="text-white" />
+              <div className="w-8 h-8 rounded-xl bg-[#ede8ff] flex items-center justify-center">
+                <LayersIcon size={16} className="text-[#6b48b0]" />
               </div>
               <span className="font-bold text-[#3d1d80]">Minha Estante</span>
             </div>
@@ -184,9 +184,7 @@ export default function App() {
                     onDelete={deleteBook}
                     onUpdateRating={(id, rating) => updateBook(id, { rating })}
                     onUpdateProgress={(id, progress, currentPage, totalPages) => {
-                      const changes = { progress, currentPage }
-                      if (totalPages) changes.pages = totalPages
-                      updateBook(id, changes)
+                      updateBook(id, { progress, currentPage: currentPage ?? 0, pages: totalPages ?? null })
                     }}
                   />
                 ))}

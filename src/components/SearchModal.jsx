@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { SearchIcon, PlusIcon, CloseIcon, BookIcon, EditIcon } from './Icons'
+import { addToCatalog, searchCatalog } from '../db'
 
 function debounce(fn, delay) {
   let timer
@@ -63,6 +64,7 @@ export default function SearchModal({ onAdd, onClose }) {
   const [manualMode, setManualMode] = useState(false)
   const [manual, setManual] = useState(EMPTY_MANUAL)
   const [manualDone, setManualDone] = useState(false)
+  const [catalogResults, setCatalogResults] = useState([])
 
   const search = useCallback(
     debounce(async (q) => {
@@ -81,6 +83,10 @@ export default function SearchModal({ onAdd, onClose }) {
     []
   )
 
+  useEffect(() => {
+    searchCatalog(query).then(setCatalogResults)
+  }, [query])
+
   function handleChange(e) {
     setQuery(e.target.value)
     search(e.target.value)
@@ -95,19 +101,19 @@ export default function SearchModal({ onAdd, onClose }) {
     setManual((prev) => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  function handleManualSubmit(e) {
+  async function handleManualSubmit(e) {
     e.preventDefault()
     if (!manual.title.trim()) return
-    onAdd({
+    const book = {
       googleId: `manual-${crypto.randomUUID()}`,
       title: manual.title.trim(),
       author: manual.author.trim() || 'Autor desconhecido',
       year: manual.year.trim(),
       pages: manual.pages ? Number(manual.pages) : null,
       cover: manual.cover.trim() || null,
-      rating: 0,
-      progress: 0,
-    })
+    }
+    await addToCatalog(book)
+    onAdd({ ...book, rating: 0, progress: 0 })
     setManualDone(true)
   }
 
@@ -320,49 +326,100 @@ export default function SearchModal({ onAdd, onClose }) {
                 </div>
               )}
 
-              {!loading && results.length > 0 && (
-                <div className="flex flex-col gap-0.5">
-                  {results.map((book) => (
-                    <div
-                      key={book.googleId}
-                      className="flex items-center gap-4 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors group"
-                    >
-                      <div className="w-11 h-16 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
-                        {book.cover ? (
-                          <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center">
-                            <BookIcon size={18} className="text-purple-300" />
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
-                        <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
-                        <p className="text-purple-300 text-xs mt-0.5">
-                          {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleAdd(book)}
-                        disabled={added.has(book.googleId)}
-                        className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                          added.has(book.googleId)
-                            ? 'bg-purple-100 text-purple-400 cursor-default'
-                            : 'bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white shadow-sm shadow-purple-200'
-                        }`}
+              {!loading && catalogResults.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-purple-300 px-1 mb-1.5">
+                    Meus cadastros
+                  </p>
+                  <div className="flex flex-col gap-0.5">
+                    {catalogResults.map((book) => (
+                      <div
+                        key={book.googleId}
+                        className="flex items-center gap-4 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors"
                       >
-                        {added.has(book.googleId) ? (
-                          '✓ Adicionado'
-                        ) : (
-                          <>
-                            <PlusIcon size={12} />
-                            Adicionar
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  ))}
+                        <div className="w-11 h-16 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
+                          {book.cover ? (
+                            <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <BookIcon size={18} className="text-purple-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
+                          <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
+                          <p className="text-purple-300 text-xs mt-0.5">
+                            {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleAdd(book)}
+                          disabled={added.has(book.googleId)}
+                          className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
+                            added.has(book.googleId)
+                              ? 'bg-purple-100 text-purple-400 cursor-default'
+                              : 'bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white shadow-sm shadow-purple-200'
+                          }`}
+                        >
+                          {added.has(book.googleId) ? '✓ Adicionado' : <><PlusIcon size={12} />Adicionar</>}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {!loading && results.length > 0 && (
+                <div>
+                  {catalogResults.length > 0 && (
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-purple-300 px-1 mb-1.5">
+                      Open Library
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-0.5">
+                    {results.map((book) => (
+                      <div
+                        key={book.googleId}
+                        className="flex items-center gap-4 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors group"
+                      >
+                        <div className="w-11 h-16 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
+                          {book.cover ? (
+                            <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <BookIcon size={18} className="text-purple-300" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
+                          <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
+                          <p className="text-purple-300 text-xs mt-0.5">
+                            {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => handleAdd(book)}
+                          disabled={added.has(book.googleId)}
+                          className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
+                            added.has(book.googleId)
+                              ? 'bg-purple-100 text-purple-400 cursor-default'
+                              : 'bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white shadow-sm shadow-purple-200'
+                          }`}
+                        >
+                          {added.has(book.googleId) ? (
+                            '✓ Adicionado'
+                          ) : (
+                            <>
+                              <PlusIcon size={12} />
+                              Adicionar
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </>

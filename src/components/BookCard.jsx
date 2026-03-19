@@ -9,6 +9,7 @@ export default function BookCard({ book, onDelete, onUpdateRating, onUpdateProgr
   const [pageInput, setPageInput] = useState(book.currentPage ?? 0)
   const [totalInput, setTotalInput] = useState(book.pages ?? '')
   const [percentInput, setPercentInput] = useState(book.progress ?? 0)
+  const [yearInput, setYearInput] = useState(book.yearRead ?? '')
   const menuRef = useRef(null)
 
   const totalPages = book.pages || null
@@ -33,29 +34,38 @@ export default function BookCard({ book, onDelete, onUpdateRating, onUpdateProgr
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  const isFinished = progress === 100
+
   function openEditing() {
     setPageInput(book.currentPage ?? 0)
     setTotalInput(book.pages ?? '')
     setPercentInput(book.progress ?? 0)
+    setYearInput(book.yearRead ?? '')
     setProgressMode(book.pages || (book.currentPage ?? 0) > 0 ? 'pages' : 'percent')
     setEditingProgress(true)
   }
 
   function submitProgress(e) {
     e?.preventDefault()
+    let pct, page, total
     if (progressMode === 'percent') {
-      const pct = Math.min(100, Math.max(0, Number(percentInput) || 0))
-      onUpdateProgress(book.id, pct, 0, null)
+      pct = Math.min(100, Math.max(0, Number(percentInput) || 0))
+      page = 0
+      total = null
     } else {
-      const total = Number(totalInput) || null
-      const page  = total ? Math.min(total, Math.max(0, Number(pageInput))) : Math.max(0, Number(pageInput))
-      const pct   = total ? Math.round((page / total) * 100) : 0
-      onUpdateProgress(book.id, pct, page, total)
+      total = Number(totalInput) || null
+      page  = total ? Math.min(total, Math.max(0, Number(pageInput))) : Math.max(0, Number(pageInput))
+      pct   = total ? Math.round((page / total) * 100) : 0
     }
+    const yearRead = pct === 100
+      ? (yearInput ? Number(yearInput) : new Date().getFullYear())
+      : null
+    onUpdateProgress(book.id, pct, page, total, yearRead)
     setEditingProgress(false)
   }
 
   function progressLabel() {
+    if (isFinished) return book.yearRead ? String(book.yearRead) : 'Concluído'
     if (totalPages) return `${book.currentPage ?? 0} / ${totalPages}`
     if ((book.currentPage ?? 0) > 0) return `Pág. ${book.currentPage}`
     return `${book.progress ?? 0}%`
@@ -181,6 +191,22 @@ export default function BookCard({ book, onDelete, onUpdateRating, onUpdateProgr
               {livePercent}%
             </span>
           </div>
+
+          {/* Ano de conclusão — aparece ao chegar em 100% */}
+          {livePercent === 100 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-purple-400 font-medium shrink-0">Lido em</span>
+              <input
+                type="number"
+                min={1900}
+                max={new Date().getFullYear() + 1}
+                placeholder={new Date().getFullYear()}
+                value={yearInput}
+                onChange={(e) => setYearInput(e.target.value)}
+                className="flex-1 min-w-0 text-xs border border-purple-300 rounded-lg px-1 py-1 outline-none text-center bg-white text-purple-800 font-semibold focus:ring-2 focus:ring-purple-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+          )}
 
           <div className="flex gap-1.5">
             <button

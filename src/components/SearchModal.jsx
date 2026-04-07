@@ -10,6 +10,66 @@ function debounce(fn, delay) {
   }
 }
 
+function BookRow({ book, isAdded, status, onStatusChange, onAdd }) {
+  return (
+    <div className="flex items-center gap-3 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors">
+      <div className="w-8 h-10 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
+        {book.cover ? (
+          <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <BookIcon size={18} className="text-purple-300" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
+        <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
+        <p className="text-purple-300 text-xs mt-0.5">
+          {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
+        </p>
+      </div>
+
+      {isAdded ? (
+        <span className="flex-shrink-0 text-xs font-bold text-purple-400 bg-purple-100 px-3 py-1.5 rounded-lg">
+          ✓ Adicionado
+        </span>
+      ) : (
+        <div className="flex-shrink-0 flex flex-col gap-1.5 items-stretch min-w-[90px]">
+          <div className="flex gap-0.5 bg-purple-100/80 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => onStatusChange('unread')}
+              className={`flex-1 text-[10px] font-bold py-1 rounded-md transition-all ${
+                status === 'unread' ? 'bg-white text-[#6b48b0] shadow-sm' : 'text-purple-400'
+              }`}
+            >
+              Não li
+            </button>
+            <button
+              type="button"
+              onClick={() => onStatusChange('read')}
+              className={`flex-1 text-[10px] font-bold py-1 rounded-md transition-all ${
+                status === 'read' ? 'bg-white text-[#6b48b0] shadow-sm' : 'text-purple-400'
+              }`}
+            >
+              Já li
+            </button>
+          </div>
+          <button
+            onClick={onAdd}
+            className="flex items-center justify-center gap-1 bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white text-xs font-bold py-1.5 rounded-lg transition-all shadow-sm shadow-purple-200"
+          >
+            <PlusIcon size={11} />
+            Adicionar
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 async function fetchBooks(query) {
   if (!query.trim()) return []
 
@@ -65,6 +125,17 @@ export default function SearchModal({ onAdd, onClose }) {
   const [manual, setManual] = useState(EMPTY_MANUAL)
   const [manualDone, setManualDone] = useState(false)
   const [catalogResults, setCatalogResults] = useState([])
+  const [format, setFormat] = useState('physical')
+  const [statuses, setStatuses] = useState({})
+  const [manualStatus, setManualStatus] = useState('unread')
+
+  function getStatus(googleId) {
+    return statuses[googleId] ?? 'unread'
+  }
+
+  function setBookStatus(googleId, val) {
+    setStatuses((prev) => ({ ...prev, [googleId]: val }))
+  }
 
   const search = useCallback(
     debounce(async (q) => {
@@ -93,7 +164,10 @@ export default function SearchModal({ onAdd, onClose }) {
   }
 
   function handleAdd(book) {
-    onAdd({ ...book, id: crypto.randomUUID(), rating: 0, progress: 0 })
+    const s = getStatus(book.googleId)
+    const progress = s === 'read' ? 100 : 0
+    const yearRead = s === 'read' ? new Date().getFullYear() : null
+    onAdd({ ...book, id: crypto.randomUUID(), rating: 0, progress, yearRead, format })
     setAdded((prev) => new Set([...prev, book.googleId]))
   }
 
@@ -112,8 +186,10 @@ export default function SearchModal({ onAdd, onClose }) {
       pages: manual.pages ? Number(manual.pages) : null,
       cover: manual.cover.trim() || null,
     }
+    const progress = manualStatus === 'read' ? 100 : 0
+    const yearRead = manualStatus === 'read' ? new Date().getFullYear() : null
     await addToCatalog(book)
-    onAdd({ ...book, rating: 0, progress: 0 })
+    onAdd({ ...book, rating: 0, progress, yearRead, format })
     setManualDone(true)
   }
 
@@ -171,6 +247,35 @@ export default function SearchModal({ onAdd, onClose }) {
               </button>
             </div>
           </div>
+
+          {/* Seletor de formato */}
+          <div className="flex gap-1 bg-purple-100/60 rounded-xl p-1 mb-3">
+            <button
+              type="button"
+              onClick={() => setFormat('physical')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                format === 'physical'
+                  ? 'bg-white text-[#6b48b0] shadow-sm'
+                  : 'text-purple-400 hover:text-purple-600'
+              }`}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              Físico
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormat('ebook')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                format === 'ebook'
+                  ? 'bg-white text-[#6b48b0] shadow-sm'
+                  : 'text-purple-400 hover:text-purple-600'
+              }`}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.5" strokeWidth="2.5" strokeLinecap="round"/></svg>
+              Ebook
+            </button>
+          </div>
+
 
           {!manualMode && (
             <div className="relative flex items-center">
@@ -279,6 +384,36 @@ export default function SearchModal({ onAdd, onClose }) {
                   />
                 </div>
 
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-semibold text-purple-500">Situação</label>
+                  <div className="flex gap-1 bg-purple-100/60 rounded-xl p-1">
+                    <button
+                      type="button"
+                      onClick={() => setManualStatus('unread')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                        manualStatus === 'unread'
+                          ? 'bg-white text-[#6b48b0] shadow-sm'
+                          : 'text-purple-400 hover:text-purple-600'
+                      }`}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Não lido
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setManualStatus('read')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                        manualStatus === 'read'
+                          ? 'bg-white text-[#6b48b0] shadow-sm'
+                          : 'text-purple-400 hover:text-purple-600'
+                      }`}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                      Já li
+                    </button>
+                  </div>
+                </div>
+
                 <button
                   type="submit"
                   disabled={!manual.title.trim()}
@@ -333,38 +468,14 @@ export default function SearchModal({ onAdd, onClose }) {
                   </p>
                   <div className="flex flex-col gap-0.5">
                     {catalogResults.map((book) => (
-                      <div
+                      <BookRow
                         key={book.googleId}
-                        className="flex items-center gap-4 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors"
-                      >
-                        <div className="w-11 h-16 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
-                          {book.cover ? (
-                            <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <BookIcon size={18} className="text-purple-300" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
-                          <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
-                          <p className="text-purple-300 text-xs mt-0.5">
-                            {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleAdd(book)}
-                          disabled={added.has(book.googleId)}
-                          className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                            added.has(book.googleId)
-                              ? 'bg-purple-100 text-purple-400 cursor-default'
-                              : 'bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white shadow-sm shadow-purple-200'
-                          }`}
-                        >
-                          {added.has(book.googleId) ? '✓ Adicionado' : <><PlusIcon size={12} />Adicionar</>}
-                        </button>
-                      </div>
+                        book={book}
+                        isAdded={added.has(book.googleId)}
+                        status={getStatus(book.googleId)}
+                        onStatusChange={(val) => setBookStatus(book.googleId, val)}
+                        onAdd={() => handleAdd(book)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -379,45 +490,14 @@ export default function SearchModal({ onAdd, onClose }) {
                   )}
                   <div className="flex flex-col gap-0.5">
                     {results.map((book) => (
-                      <div
+                      <BookRow
                         key={book.googleId}
-                        className="flex items-center gap-4 py-3 px-3 hover:bg-[#f3eeff] rounded-xl transition-colors group"
-                      >
-                        <div className="w-11 h-16 rounded-lg overflow-hidden bg-purple-100 flex-shrink-0 shadow-sm">
-                          {book.cover ? (
-                            <img src={book.cover} alt={book.title} className="w-full h-full object-cover" />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <BookIcon size={18} className="text-purple-300" />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-[#3d1d80] text-sm leading-tight line-clamp-2">{book.title}</p>
-                          <p className="text-purple-500 text-xs mt-0.5 font-medium">{book.author}</p>
-                          <p className="text-purple-300 text-xs mt-0.5">
-                            {[book.year, book.pages ? `${book.pages} pág.` : null].filter(Boolean).join(' · ')}
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => handleAdd(book)}
-                          disabled={added.has(book.googleId)}
-                          className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 ${
-                            added.has(book.googleId)
-                              ? 'bg-purple-100 text-purple-400 cursor-default'
-                              : 'bg-[#6b48b0] hover:bg-[#7d57c8] active:scale-95 text-white shadow-sm shadow-purple-200'
-                          }`}
-                        >
-                          {added.has(book.googleId) ? (
-                            '✓ Adicionado'
-                          ) : (
-                            <>
-                              <PlusIcon size={12} />
-                              Adicionar
-                            </>
-                          )}
-                        </button>
-                      </div>
+                        book={book}
+                        isAdded={added.has(book.googleId)}
+                        status={getStatus(book.googleId)}
+                        onStatusChange={(val) => setBookStatus(book.googleId, val)}
+                        onAdd={() => handleAdd(book)}
+                      />
                     ))}
                   </div>
                 </div>

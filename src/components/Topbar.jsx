@@ -1,6 +1,6 @@
 import { LayersIcon, SearchIcon, PlusIcon } from './Icons'
 
-export default function Topbar({ navItems, activeTab, onTabChange, search, onSearchChange, onAdd }) {
+export default function Topbar({ navItems, activeTab, onTabChange, search, onSearchChange, onAdd, goalsNavItem }) {
   return (
     <header className="sticky top-0 z-40 bg-[#f3eeff]/90 backdrop-blur-md border-b border-purple-100">
       <div className="px-6 py-4 flex items-center gap-4">
@@ -50,7 +50,7 @@ export default function Topbar({ navItems, activeTab, onTabChange, search, onSea
 
       {/* Abas mobile */}
       <div className="lg:hidden flex gap-1 px-6 pb-3 overflow-x-auto">
-        {navItems.map(({ id, label, count }) => (
+        {[...navItems, goalsNavItem].filter(Boolean).map(({ id, label, count }) => (
           <button
             key={id}
             onClick={() => onTabChange(id)}
@@ -61,9 +61,11 @@ export default function Topbar({ navItems, activeTab, onTabChange, search, onSea
             }`}
           >
             {label}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
-              activeTab === id ? 'bg-white/20 text-white' : 'bg-purple-50 text-purple-400'
-            }`}>{count}</span>
+            {count !== undefined && (
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                activeTab === id ? 'bg-white/20 text-white' : 'bg-purple-50 text-purple-400'
+              }`}>{count}</span>
+            )}
           </button>
         ))}
       </div>

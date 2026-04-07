@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(/usr/local/bin/npm run:*)",
+      "Bash(node_modules/.bin/vite build:*)",
+      "Read(//opt/homebrew/Cellar/node/25.3.0/bin/**)",
+      "Read(//usr/bin/**)",
+      "Bash(/opt/homebrew/bin/node node_modules/.bin/vite build)"
+    ]
+  }
+}

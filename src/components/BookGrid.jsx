@@ -16,7 +16,7 @@ function groupByYear(books) {
   })
 }
 
-export default function BookGrid({ books, filtered, search, tabLabel, activeTab, onAdd, onDelete, onUpdateRating, onUpdateProgress }) {
+export default function BookGrid({ books, filtered, search, tabLabel, activeTab, onAdd, onDelete, onUpdateRating, onUpdateProgress, onToggleFavorite, onUpdateFormat, onUpdateReview, onUpdateBook }) {
   if (books.length === 0) return <EmptyShelf onAdd={onAdd} />
 
   if (filtered.length === 0) {
@@ -29,7 +29,7 @@ export default function BookGrid({ books, filtered, search, tabLabel, activeTab,
     )
   }
 
-  const cardProps = { onDelete, onUpdateRating, onUpdateProgress }
+  const cardProps = { onDelete, onUpdateRating, onUpdateProgress, onToggleFavorite, onUpdateFormat, onUpdateReview, onUpdateBook }
   const showGrouped = activeTab === 'finished' && !search
 
   return (

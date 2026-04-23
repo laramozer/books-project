@@ -77,38 +77,40 @@ function BookPicker({ books, goalBookIds, month, onClose }) {
 
 function PlannedBookRow({ book, isFinished, month }) {
   return (
-    <div className={`flex items-center gap-3 rounded-xl px-3 py-2.5 border transition-colors ${
-      isFinished
-        ? 'bg-green-50 border-green-200'
-        : 'bg-white/60 border-purple-100'
-    }`}>
-      {book.cover ? (
-        <img src={book.cover} alt="" className="w-20 h-28 object-contain rounded-lg flex-shrink-0 shadow-sm" />
-      ) : (
-        <div className="w-20 h-28 rounded-lg bg-purple-100 flex-shrink-0" />
-      )}
-      <div className="min-w-0 flex-1">
-        <p className={`text-sm font-medium truncate ${isFinished ? 'text-green-800' : 'text-[#3d1d80]'}`}>
-          {book.title}
-        </p>
-        <p className={`text-xs truncate ${isFinished ? 'text-green-600' : 'text-purple-400'}`}>
-          {book.author}
-        </p>
+    <div className="relative flex flex-col items-center w-24 flex-shrink-0">
+      {/* Botão remover */}
+      <button
+        onClick={() => removeBookFromGoal(month, book.id)}
+        className="absolute -top-1.5 -right-1.5 z-10 w-5 h-5 rounded-full bg-white border border-purple-200 flex items-center justify-center text-purple-300 hover:text-red-400 hover:border-red-300 transition-colors shadow-sm"
+        title="Remover da meta"
+      >
+        <CloseIcon size={10} />
+      </button>
+
+      {/* Capa */}
+      <div className="relative w-20 h-28">
+        {book.cover ? (
+          <img src={book.cover} alt="" className="w-full h-full object-contain rounded-lg shadow-sm" />
+        ) : (
+          <div className="w-full h-full rounded-lg bg-purple-100" />
+        )}
+        {isFinished && (
+          <div className="absolute bottom-1 right-1 bg-white rounded-full shadow-sm">
+            <CheckCircleIcon size={16} className="text-green-500" />
+          </div>
+        )}
       </div>
-      {isFinished ? (
-        <CheckCircleIcon size={16} className="text-green-500 flex-shrink-0" />
-      ) : (
-        <span className="text-[10px] font-semibold text-purple-400 bg-purple-100 px-2 py-0.5 rounded-full flex-shrink-0">
+
+      {/* Título com altura fixa */}
+      <p className="text-[11px] font-medium text-[#3d1d80] text-center mt-1.5 line-clamp-2 w-full leading-tight h-8">
+        {book.title}
+      </p>
+      {/* Badge sempre na mesma posição */}
+      {!isFinished && (
+        <span className="text-[10px] font-semibold text-purple-400 bg-purple-100 px-1.5 py-0.5 rounded-full mt-1">
           {book.progress > 0 ? `${book.progress}%` : 'Não iniciado'}
         </span>
       )}
-      <button
-        onClick={() => removeBookFromGoal(month, book.id)}
-        className="text-purple-200 hover:text-red-400 transition-colors flex-shrink-0 ml-1"
-        title="Remover da meta"
-      >
-        <CloseIcon size={13} />
-      </button>
     </div>
   )
 }
@@ -184,7 +186,7 @@ function MonthCard({ monthKey, goal, plannedBooks, allBooks, isCurrentMonth, onD
 
       {/* Lista de livros planejados */}
       {plannedWithData.length > 0 && (
-        <div className="flex flex-col gap-2 mt-3">
+        <div className="flex flex-row flex-wrap gap-4 mt-4 items-start">
           {plannedWithData.map((b) => (
             <PlannedBookRow key={b.id} book={b} isFinished={b.progress === 100} month={monthKey} />
           ))}
@@ -211,7 +213,7 @@ function MonthCard({ monthKey, goal, plannedBooks, allBooks, isCurrentMonth, onD
       )}
 
       {/* Botão adicionar livro */}
-      {isCurrentMonth && (
+      {(
         <div className="mt-3">
           <button
             onClick={() => setShowPicker((v) => !v)}
@@ -238,6 +240,9 @@ export default function GoalsView({ books }) {
   const [newTarget, setNewTarget] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [showAddForm, setShowAddForm] = useState(false)
+  const [formPickerSearch, setFormPickerSearch] = useState('')
+  const [showFormPicker, setShowFormPicker] = useState(false)
+  const [formSelectedBooks, setFormSelectedBooks] = useState([])
 
   const goals = useLiveQuery(() => db.goals.orderBy('month').reverse().toArray(), [])
   const goalBooks = useLiveQuery(() => db.goalBooks.toArray(), [])
@@ -251,10 +256,23 @@ export default function GoalsView({ books }) {
 
   async function handleSave() {
     const n = parseInt(newTarget)
-    if (!n || n < 1) return
-    await setGoal(selectedMonth, n)
+    const hasBooks = formSelectedBooks.length > 0
+    if (!n && !hasBooks) return
+    if (n > 0) await setGoal(selectedMonth, n)
+    for (const bookId of formSelectedBooks) {
+      await addBookToGoal(selectedMonth, bookId)
+    }
     setNewTarget('')
+    setFormSelectedBooks([])
+    setFormPickerSearch('')
+    setShowFormPicker(false)
     setShowAddForm(false)
+  }
+
+  function toggleFormBook(bookId) {
+    setFormSelectedBooks((prev) =>
+      prev.includes(bookId) ? prev.filter((id) => id !== bookId) : [...prev, bookId]
+    )
   }
 
   async function handleDelete(month) {
@@ -264,7 +282,7 @@ export default function GoalsView({ books }) {
   function getMonthOptions() {
     const opts = []
     const now = new Date()
-    for (let i = -1; i <= 2; i++) {
+    for (let i = -1; i <= 6; i++) {
       const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
       const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
       opts.push(key)
@@ -272,7 +290,14 @@ export default function GoalsView({ books }) {
     return opts
   }
 
-  const pastGoals = goals?.filter((g) => g.month !== currentMonth) ?? []
+  const futureGoalMonths = [
+    ...new Set([
+      ...(goals?.filter((g) => g.month > currentMonth).map((g) => g.month) ?? []),
+      ...(goalBooks?.filter((gb) => gb.month > currentMonth).map((gb) => gb.month) ?? []),
+    ]),
+  ].sort((a, b) => a.localeCompare(b))
+
+  const pastGoals = goals?.filter((g) => g.month < currentMonth).sort((a, b) => b.month.localeCompare(a.month)) ?? []
 
   return (
     <div className="max-w-xl mx-auto py-2">
@@ -299,13 +324,13 @@ export default function GoalsView({ books }) {
       {/* Formulário nova meta */}
       {showAddForm && (
         <div className="bg-white border border-purple-200 rounded-2xl p-5 mb-6 shadow-sm">
-          <p className="text-sm font-semibold text-[#3d1d80] mb-4">Definir meta numérica</p>
+          <p className="text-sm font-semibold text-[#3d1d80] mb-4">Nova meta</p>
           <div className="flex flex-col gap-3">
             <div>
               <label className="text-xs text-purple-500 font-medium mb-1 block">Mês</label>
               <select
                 value={selectedMonth}
-                onChange={(e) => setSelectedMonth(e.target.value)}
+                onChange={(e) => { setSelectedMonth(e.target.value); setFormSelectedBooks([]) }}
                 className="w-full border border-purple-200 rounded-xl px-3 py-2.5 text-sm text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
               >
                 {getMonthOptions().map((m) => (
@@ -313,32 +338,107 @@ export default function GoalsView({ books }) {
                 ))}
               </select>
             </div>
+
             <div>
-              <label className="text-xs text-purple-500 font-medium mb-1 block">Quantos livros?</label>
+              <label className="text-xs text-purple-500 font-medium mb-1 block">Quantos livros? <span className="font-normal text-purple-300">(opcional)</span></label>
               <input
                 type="number"
                 min="1"
                 max="99"
                 value={newTarget}
                 onChange={(e) => setNewTarget(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSave()}
                 placeholder="Ex: 4"
                 className="w-full border border-purple-200 rounded-xl px-3 py-2.5 text-sm text-purple-900 focus:outline-none focus:ring-2 focus:ring-purple-400 placeholder:text-purple-300"
               />
             </div>
-            <p className="text-xs text-purple-400">
-              Você também pode adicionar livros específicos diretamente no card do mês.
-            </p>
+
+            {/* Livros selecionados */}
+            {formSelectedBooks.length > 0 && (
+              <div className="flex flex-col gap-1.5">
+                {formSelectedBooks.map((id) => {
+                  const b = books.find((x) => x.id === id)
+                  if (!b) return null
+                  return (
+                    <div key={id} className="flex items-center gap-2 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2">
+                      {b.cover && <img src={b.cover} alt="" className="w-8 h-10 object-contain rounded flex-shrink-0" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium text-[#3d1d80] truncate">{b.title}</p>
+                        <p className="text-[11px] text-purple-400 truncate">{b.author}</p>
+                      </div>
+                      <button onClick={() => toggleFormBook(id)} className="text-purple-300 hover:text-red-400 transition-colors flex-shrink-0">
+                        <CloseIcon size={13} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Picker de livros */}
+            <div>
+              <button
+                onClick={() => setShowFormPicker((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-medium text-purple-500 hover:text-[#6b48b0] transition-colors"
+              >
+                <PlusIcon size={13} />
+                Adicionar livro à meta
+              </button>
+              {showFormPicker && (
+                <div className="mt-2 border border-purple-200 rounded-xl bg-white overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2.5 border-b border-purple-100">
+                    <SearchIcon size={14} className="text-purple-300 flex-shrink-0" />
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Buscar livro da estante..."
+                      value={formPickerSearch}
+                      onChange={(e) => setFormPickerSearch(e.target.value)}
+                      className="flex-1 text-sm text-purple-900 placeholder:text-purple-300 outline-none bg-transparent"
+                    />
+                    <button onClick={() => setShowFormPicker(false)} className="text-purple-300 hover:text-purple-500 transition-colors">
+                      <CloseIcon size={14} />
+                    </button>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {books
+                      .filter((b) =>
+                        !formSelectedBooks.includes(b.id) &&
+                        (b.title.toLowerCase().includes(formPickerSearch.toLowerCase()) ||
+                          b.author.toLowerCase().includes(formPickerSearch.toLowerCase()))
+                      )
+                      .map((b) => (
+                        <button
+                          key={b.id}
+                          onClick={() => { toggleFormBook(b.id); setShowFormPicker(false); setFormPickerSearch('') }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-purple-50 transition-colors text-left border-b border-purple-50 last:border-0"
+                        >
+                          {b.cover ? (
+                            <img src={b.cover} alt="" className="w-8 h-10 object-contain rounded-lg flex-shrink-0" />
+                          ) : (
+                            <div className="w-8 h-10 rounded-lg bg-purple-100 flex-shrink-0" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-[#3d1d80] truncate">{b.title}</p>
+                            <p className="text-xs text-purple-400 truncate">{b.author}</p>
+                          </div>
+                          <PlusIcon size={14} className="text-purple-300 flex-shrink-0 ml-auto" />
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-2 pt-1">
               <button
                 onClick={handleSave}
-                disabled={!newTarget || parseInt(newTarget) < 1}
+                disabled={!newTarget && formSelectedBooks.length === 0}
                 className="flex-1 bg-[#6b48b0] hover:bg-[#7d57c8] disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-all"
               >
                 Salvar meta
               </button>
               <button
-                onClick={() => { setShowAddForm(false); setNewTarget('') }}
+                onClick={() => { setShowAddForm(false); setNewTarget(''); setFormSelectedBooks([]); setShowFormPicker(false) }}
                 className="px-4 py-2.5 rounded-xl border border-purple-200 text-purple-500 text-sm font-medium hover:bg-purple-50 transition-colors"
               >
                 Cancelar
@@ -372,6 +472,26 @@ export default function GoalsView({ books }) {
           </div>
         )}
       </div>
+
+      {/* Meses futuros */}
+      {futureGoalMonths.length > 0 && (
+        <div>
+          <p className="text-purple-300 text-[10px] font-semibold uppercase tracking-widest mb-3 mt-6">Próximos meses</p>
+          <div className="flex flex-col gap-3">
+            {futureGoalMonths.map((month) => (
+              <MonthCard
+                key={month}
+                monthKey={month}
+                goal={goals?.find((g) => g.month === month) ?? null}
+                plannedBooks={goalBooks?.filter((gb) => gb.month === month) ?? []}
+                allBooks={books}
+                isCurrentMonth={false}
+                onDeleteGoal={handleDelete}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Metas anteriores */}
       {pastGoals.length > 0 && (
